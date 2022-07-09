@@ -15,7 +15,7 @@ use Automattic\WooCommerce\Client;
 if ( ! class_exists('EUX_CRM_API') ) {
     class EUX_CRM_API {
 
-        public $customer_data;
+        public $wc_api;
 
         protected static $_instance = null;
 
@@ -34,15 +34,22 @@ if ( ! class_exists('EUX_CRM_API') ) {
 
         // authorize
         function authorize() {
-
+            //$this->wc_api
             $woocommerce = new Client(
-                'http://localhost:10033/',
+                'http://localhost:10033',
                 'ck_2f7573d408d421a348a2da3e9169745c14048a38',
                 'cs_29dd07d7098fb1c94605d8cd47dae2db50a28ef2',
                 [
+                    'wp_api' => true,
                     'version' => 'wc/v3',
                 ]
             );
+
+            $result = $woocommerce->get('customers');
+
+            die(print_r($result));
+
+            return $this;
 
 
         }

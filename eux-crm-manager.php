@@ -26,6 +26,9 @@ defined( 'ABSPATH' ) || exit;
 // autoload
 require __DIR__ . '/vendor/autoload.php';
 
+use Automattic\WooCommerce\Client;
+use Automattic\WooCommerce\HttpClient\HttpClientException;
+
 if ( ! defined( 'EUX_FILE' ) ) {
     define( 'EUX_FILE', __FILE__ );
 }
@@ -38,16 +41,111 @@ if ( ! defined( 'EUX_PLUGIN_PATH' ) ) {
     define( 'EUX_PLUGIN_PATH', untrailingslashit(plugin_dir_path(EUX_FILE)) );
 }
 
+
+/**
+ * EUX CRM API Settings Init
+ */
+function eux_crm_api_settings_init() {
+    register_setting( 'eux_crm_api_settings', 'eux_crm_general_settings' );
+    add_settings_section(
+        'eux_crm_general_setting',
+        __( '', 'eux-crm-manager' ),
+        '',
+        'eux-crm-api-settings'
+    );
+
+    add_settings_field(
+        'eux_crm_api_consumer_key',
+        __( 'Consumer Key:', 'eux-crm-manager' ),
+        'eux_crm_api_consumer_key_cb',
+        'eux-crm-api-settings',
+        'eux_crm_general_setting'
+    );
+
+    add_settings_field(
+        'eux_crm_api_consumer_secret',
+        __( 'Consumer Secret:', 'eux-crm-manager' ),
+        'eux_crm_api_consumer_secret_cb',
+        'eux-crm-api-settings',
+        'eux_crm_general_setting'
+    );
+}
+add_action( 'admin_init', 'eux_crm_api_settings_init' );
+
+
+/**
+ * EUX CRM API consumer key callback.
+ */
+function eux_crm_api_consumer_key_cb() {
+    $options = get_option( 'eux_crm_general_settings' );
+    $options = ! empty( $options ) ? $options : "";
+    $val = ( isset( $options['eux_crm_api_consumer_key'] ) && !empty($options['eux_crm_api_consumer_key']) ) ? $options['eux_crm_api_consumer_key'] : "";
+    echo '<input type="text" class="eux-crm-api-consumer-key" name="eux_crm_general_settings[eux_crm_api_consumer_key]" value="' . $val . '" />';
+    echo sprintf('<p class="eux-setting-description"><span>&#9432;</span> %s</p>', esc_html__('Woocommerce consumer key here.', 'eux-crm-manager'));
+}
+
+/**
+ * EUX CRM API consumer secret callback.
+ */
+function eux_crm_api_consumer_secret_cb() {
+    $options = get_option( 'eux_crm_general_settings' );
+    $options = ! empty( $options ) ? $options : "";
+    $val = ( isset( $options['eux_crm_api_consumer_secret'] ) && !empty($options['eux_crm_api_consumer_secret']) ) ? $options['eux_crm_api_consumer_secret'] : "";
+    echo '<input type="text" class="eux-crm-api-consumer-secret" name="eux_crm_general_settings[eux_crm_api_consumer_secret]" value="' . $val . '" />';
+    echo sprintf('<p class="eux-setting-description"><span>&#9432;</span> %s</p>', esc_html__('Woocommerce consumer secret here.', 'eux-crm-manager'));
+}
+
+
+add_action("admin_menu", "eux_crm_submenu");
+function eux_crm_submenu() {
+    add_submenu_page(
+        'options-general.php',
+        __("EUX CRM API Settings", "eux-crm-manager"),
+        __("EUX CRM API", "eux-crm-manager"),
+        'administrator',
+        'eux-crm-api-settings',
+        'eux_crm_api_settings_page' );
+}
+
+function eux_crm_api_settings_page() {
+    // check user capabilities
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+
+    // WordPress will add the "settings-updated" $_GET parameter to the url
+    if ( isset( $_GET['settings-updated'] ) ) {
+        // add settings saved message with the class of "updated"
+        add_settings_error( 'eux_messages', 'eux_messages', __( 'Settings Saved', 'eux-crm-manager' ), 'updated' );
+    }
+
+    // show error/update messages
+    settings_errors( 'eux_messages' );
+    ?>
+    <div class="wrap">
+        <h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+        <form action="options.php" method="post">
+            <?php
+            settings_fields( 'eux_crm_api_settings' );
+            do_settings_sections( 'eux-crm-api-settings' );
+
+            // output save settings button
+            submit_button( 'Save Settings' );
+            ?>
+        </form>
+    </div>
+    <?php
+}
+
+
 include EUX_PLUGIN_PATH . '/includes/class-eux-crm-api.php';
 $eux_crm_api = EUX_CRM_API::instance();
 $eux_crm_api->init_rest_api();
 
 
-//add_filter('woocommerce_rest_prepare_customer', 'filter_response', 10, 3);
+add_filter('woocommerce_rest_prepare_customer', 'filter_response', 10, 3);
 function filter_response($response, $user_data, $request) {
     // Customize response data here
-    //$user_id = $user_data->ID;
-
     $phone = $request->get_param('phone');
 
     if( isset($phone) && ! empty($phone) ) {
@@ -62,27 +160,53 @@ function filter_response($response, $user_data, $request) {
             $user_id = $customer[0]->user_id;
         }
 
+        //$eux_crm_api = EUX_CRM_API::instance();
+        //$wc_api = $eux_crm_api->authorize();
+        //$result = $wc_api->get('customers/2');
 
-        $data = $response->get_data();
-
-        $newdata = [];
-
-        if ($request['fields'] != null)
-        {
-            foreach ( explode ( ",", $request['fields'] ) as $field )
-            {
-                $newdata[$field] = $data[$field];
-            }
+        $options = get_option( 'eux_crm_general_settings' );
+        $options = ! empty( $options ) ? $options : "";
+        $consumer_key       = ( isset( $options['eux_crm_api_consumer_key'] ) && !empty($options['eux_crm_api_consumer_key']) ) ? $options['eux_crm_api_consumer_key'] : "";
+        $consumer_secret    = ( isset( $options['eux_crm_api_consumer_secret'] ) && !empty($options['eux_crm_api_consumer_secret']) ) ? $options['eux_crm_api_consumer_secret'] : "";
 
 
-        }
+        $woocommerce = new Client(
+            'http://localhost:10033',
+            $consumer_key,
+            $consumer_secret,
+            [
+                'wp_api' => true,
+                'version' => 'wc/v3',
+        //        'timeout'=> 30,
+//                'verify_ssl'=> false,
+            ]
+        );
+
+        $result = $woocommerce->get('customers');
+
+
+        return [$result];
+
+//        $data = $response->get_data();
+
+//        $newdata = [];
+//
+//        if ($request['fields'] != null)
+//        {
+//            foreach ( explode ( ",", $request['fields'] ) as $field )
+//            {
+//                $newdata[$field] = $data[$field];
+//            }
+//
+//
+//        }
 
         //$ndata = [];
         //$response->set_data( $ndata );
 
-        if( $data['id'] == 3 ) {
-            return $response;
-        }
+//        if( $data['id'] == 3 ) {
+//            return $response;
+//        }
 
 
 
