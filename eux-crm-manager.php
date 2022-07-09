@@ -138,6 +138,43 @@ function eux_crm_api_settings_page() {
 }
 
 
+function eux_crm_api_curl() {
+    $url = "http://localhost:10033/wp-json/wc/v3/customers/2";
+
+    $options = get_option( 'eux_crm_general_settings' );
+    $options = ! empty( $options ) ? $options : "";
+    $consumer_key       = ( isset( $options['eux_crm_api_consumer_key'] ) && !empty($options['eux_crm_api_consumer_key']) ) ? $options['eux_crm_api_consumer_key'] : "";
+    $consumer_secret    = ( isset( $options['eux_crm_api_consumer_secret'] ) && !empty($options['eux_crm_api_consumer_secret']) ) ? $options['eux_crm_api_consumer_secret'] : "";
+
+    $headers = array(
+        'Authorization' => 'Basic ' . base64_encode($consumer_key.':'.$consumer_secret )
+    );
+
+    $curl = curl_init();
+    curl_setopt($curl, CURLOPT_URL, $url);
+    //curl_setopt($curl, CURLOPT_POST, true);
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($curl, CURLOPT_TIMEOUT, 30);
+
+    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+    //curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($data));
+
+    //for debug only!
+    curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($curl, CURLOPT_USERPWD, "$consumer_key:$consumer_secret");
+    $resp = curl_exec($curl);
+    $status_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    curl_close($curl);
+
+
+    error_log( print_r(json_decode($resp)), true );
+//    die();
+
+    return json_decode($resp);
+}
+
+
 include EUX_PLUGIN_PATH . '/includes/class-eux-crm-api.php';
 $eux_crm_api = EUX_CRM_API::instance();
 $eux_crm_api->init_rest_api();
@@ -170,19 +207,21 @@ function filter_response($response, $user_data, $request) {
         $consumer_secret    = ( isset( $options['eux_crm_api_consumer_secret'] ) && !empty($options['eux_crm_api_consumer_secret']) ) ? $options['eux_crm_api_consumer_secret'] : "";
 
 
-        $woocommerce = new Client(
-            'http://localhost:10033',
-            $consumer_key,
-            $consumer_secret,
-            [
-                'wp_api' => true,
-                'version' => 'wc/v3',
-        //        'timeout'=> 30,
-//                'verify_ssl'=> false,
-            ]
-        );
+        $result = eux_crm_api_curl();
 
-        $result = $woocommerce->get('customers');
+//        $woocommerce = new Client(
+//            'http://localhost:10033',
+//            $consumer_key,
+//            $consumer_secret,
+//            [
+//                'wp_api' => true,
+//                'version' => 'wc/v3',
+//        //        'timeout'=> 30,
+////                'verify_ssl'=> false,
+//            ]
+//        );
+//
+//        $result = $woocommerce->get('customers');
 
 
         return [$result];
