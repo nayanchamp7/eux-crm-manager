@@ -43,10 +43,10 @@ $eux_crm_api = EUX_CRM_API::instance();
 $eux_crm_api->init_rest_api();
 
 
-add_filter('woocommerce_rest_prepare_customer', 'filter_response', 10, 3);
+//add_filter('woocommerce_rest_prepare_customer', 'filter_response', 10, 3);
 function filter_response($response, $user_data, $request) {
     // Customize response data here
-    $user_id = $user_data->ID;
+    //$user_id = $user_data->ID;
 
     $phone = $request->get_param('phone');
 
@@ -62,18 +62,54 @@ function filter_response($response, $user_data, $request) {
             $user_id = $customer[0]->user_id;
         }
 
-        $consumer_key = $request->get_param('oauth_consumer_key');
+
+        $data = $response->get_data();
+
+        $newdata = [];
+
+        if ($request['fields'] != null)
+        {
+            foreach ( explode ( ",", $request['fields'] ) as $field )
+            {
+                $newdata[$field] = $data[$field];
+            }
+
+
+        }
+
+        //$ndata = [];
+        //$response->set_data( $ndata );
+
+        if( $data['id'] == 3 ) {
+            return $response;
+        }
+
+
+
+        //if( isset($response) && count($response) > 0 ) {
+//            foreach($response as $index => $item) {
+//                //die(print_r($item));
+//                //echo $item->id;
+//                //echo "<br>";
+//            }
+        //}
+
+
+        //$consumer_key = $request->get_param('oauth_consumer_key');
+        //echo $consumer_secret = $request->get_param('user_id');
+
+
 
         //cs_29dd07d7098fb1c94605d8cd47dae2db50a28ef2
-        $table_name = $wpdb->prefix . "woocommerce_api_keys";
-        $query = "SELECT 'consumer_secret' FROM $table_name WHERE 'user_id' = $user_id";
-        $customer = $wpdb->get_results($query, OBJECT);
-        $consumer_secret_key = $request->get_param('oauth_consumer_key');
+//        $table_name = $wpdb->prefix . "woocommerce_api_keys";
+//        $query = "SELECT 'consumer_secret' FROM $table_name WHERE 'user_id' = $user_id";
+//        $customer = $wpdb->get_results($query, OBJECT);
+//        $consumer_secret_key = $request->get_param('oauth_consumer_key');
 
 
     }
 //
 //    die(print_r($response->data));
 
-    return $response;
+    //return $response;
 }
