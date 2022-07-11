@@ -72,6 +72,17 @@ if ( ! class_exists('EUX_CRM_API') ) {
                     'permission_callback' => '__return_true',
                 )
             );
+
+            // register rest route to post a new customer
+            register_rest_route(
+                'eux/v1',
+                '/customers/',
+                array(
+                    'methods' => 'POST',
+                    'callback' => [$this, 'eux_post_to_create_new_customer'],
+                    'permission_callback' => '__return_true',
+                )
+            );
         }
 
         // get customer data by phone number or email
@@ -160,6 +171,42 @@ if ( ! class_exists('EUX_CRM_API') ) {
                 $result
             ]);
 
+
+        }
+
+        // post to create a new customer
+        function eux_post_to_create_new_customer($request) {
+            // Fetching values from API
+            $parameters = $request->get_params();
+            $data = [];
+
+
+
+            if( isset($parameters['email']) && isset($parameters['firstname']) ) {
+
+                if( ! email_exists($parameters['email']) ) {
+                    $user_id = wc_create_new_customer( $parameters['email'], $parameters['firstname'], rand() );
+
+                    $lastname   = isset($parameters['lastname']) ? $parameters['lastname'] : '';
+                    $phone      = isset($parameters['phone']) ? $parameters['phone'] : '';
+
+                    update_user_meta( $user_id, "billing_first_name", $parameters['firstname'] );
+                    update_user_meta( $user_id, "billing_last_name", $lastname );
+                    update_user_meta( $user_id, "billing_phone", $phone );
+                    update_user_meta( $user_id, "billing_email", $parameters['email'] );
+
+
+                    $data['id'] = $user_id;
+                    $data['email'] = $parameters['email'];
+                    $data['phone'] = $phone;
+                    $data['first_name'] = $parameters['firstname'];
+                    $data['last_name'] = $lastname;
+                }
+            }
+
+            return new WP_REST_Response([
+                $data
+            ]);
 
         }
     }
