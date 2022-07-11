@@ -62,33 +62,50 @@ if ( ! class_exists('EUX_CRM_API') ) {
         // create eux api endpoint
         function eux_register_api() {
 
+            // register rest route to get customer data by phone and email
             register_rest_route(
                 'eux/v1',
                 '/customers/',
                 array(
                     'methods' => 'GET',
-                    'callback' => [$this, 'eux_get_customer_by_phone'],
+                    'callback' => [$this, 'eux_get_customer_by_phone_n_email'],
                     'permission_callback' => '__return_true',
                 )
             );
         }
 
-        // get customer data by phone number
-        function eux_get_customer_by_phone($request) {
+        // get customer data by phone number or email
+        function eux_get_customer_by_phone_n_email($request) {
 
             $result  = [];
             $phone = $request->get_param('phone');
+            $email = $request->get_param('email');
 
             if( isset($phone) && ! empty($phone) ) {
                 $user_id = '';
                 global $wpdb;
                 $search_phone = (string)"%" . $phone . "%";
-                $search_phone = $phone;
+                //$search_phone = $phone;
 
-                $query = "SELECT * FROM $wpdb->usermeta WHERE $wpdb->usermeta.meta_key = 'billing_phone' AND $wpdb->usermeta.meta_value = '" . $search_phone . "'  ORDER BY $wpdb->usermeta.user_id DESC";
+                $query = "SELECT * FROM $wpdb->usermeta WHERE $wpdb->usermeta.meta_key = 'billing_phone' AND $wpdb->usermeta.meta_value LIKE '" . $search_phone . "'  ORDER BY $wpdb->usermeta.user_id DESC";
 
                 $customer = $wpdb->get_results($query, OBJECT);
 
+            }
+
+            if( isset($email) && ! empty($email) ) {
+                $user_id = '';
+                global $wpdb;
+                $search_email = (string)"%" . $email . "%";
+                $search_email = $email;
+
+                $query = "SELECT * FROM $wpdb->usermeta WHERE $wpdb->usermeta.meta_key = 'billing_email' AND $wpdb->usermeta.meta_value = '" . $search_email . "'  ORDER BY $wpdb->usermeta.user_id DESC";
+
+                $customer = $wpdb->get_results($query, OBJECT);
+
+            }
+
+            if( isset($phone) || isset($email) ) {
                 if (isset($customer) && count($customer) > 0) {
                     $user_id = $customer[0]->user_id;
 
@@ -135,9 +152,9 @@ if ( ! class_exists('EUX_CRM_API') ) {
 
                     $result = $customer_data;
                 }
-
-
             }
+
+
 
             return new WP_REST_Response([
                 $result
