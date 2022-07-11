@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: EUX CRM Manager
- * Plugin URI: https://profiles.wordpress.org/wpfeelteam/
+ * Plugin URI: https://eux.com.au/
  * Description: A CRM Manager for 3CX with Woocommerce API Integration.
  * Version: 1.0.0
  * Author: EUX Digital Agency
