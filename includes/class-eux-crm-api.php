@@ -83,6 +83,17 @@ if ( ! class_exists('EUX_CRM_API') ) {
                     'permission_callback' => '__return_true',
                 )
             );
+
+            // register rest route to post a new customer
+            register_rest_route(
+                'eux/v1',
+                '/customers/search/',
+                array(
+                    'methods' => 'GET',
+                    'callback' => [$this, 'eux_search_customer_by_phone'],
+                    'permission_callback' => '__return_true',
+                )
+            );
         }
 
         // get customer data by phone number or email
@@ -121,51 +132,9 @@ if ( ! class_exists('EUX_CRM_API') ) {
                     $user_id = $customer[0]->user_id;
 
                     $customer = new WC_Customer($user_id);
-                    $last_order = $customer->get_last_order();
-                    $customer_data = array(
-                        'id' => $customer->get_id(),
-                        'email' => $customer->get_email(),
-                        'first_name' => $customer->get_first_name(),
-                        'last_name' => $customer->get_last_name(),
-                        'username' => $customer->get_username(),
-                        'role' => $customer->get_role(),
-                        'phone' => $customer->get_billing_phone(),
-                        'last_order_id' => is_object($last_order) ? $last_order->get_id() : null,
-                        'last_order_date' => is_object($last_order) ? eux_format_datetime($last_order->get_date_created() ? $last_order->get_date_created()->getTimestamp() : 0) : null, // API gives UTC times.
-                        'orders_count' => $customer->get_order_count(),
-                        'total_spent' => wc_format_decimal($customer->get_total_spent(), 2),
-                        'avatar_url' => $customer->get_avatar_url(),
-                        'billing_address' => array(
-                            'first_name' => $customer->get_billing_first_name(),
-                            'last_name' => $customer->get_billing_last_name(),
-                            'company' => $customer->get_billing_company(),
-                            'address_1' => $customer->get_billing_address_1(),
-                            'address_2' => $customer->get_billing_address_2(),
-                            'city' => $customer->get_billing_city(),
-                            'state' => $customer->get_billing_state(),
-                            'postcode' => $customer->get_billing_postcode(),
-                            'country' => $customer->get_billing_country(),
-                            'email' => $customer->get_billing_email(),
-                            'phone' => $customer->get_billing_phone(),
-                        ),
-                        'shipping_address' => array(
-                            'first_name' => $customer->get_shipping_first_name(),
-                            'last_name' => $customer->get_shipping_last_name(),
-                            'company' => $customer->get_shipping_company(),
-                            'address_1' => $customer->get_shipping_address_1(),
-                            'address_2' => $customer->get_shipping_address_2(),
-                            'city' => $customer->get_shipping_city(),
-                            'state' => $customer->get_shipping_state(),
-                            'postcode' => $customer->get_shipping_postcode(),
-                            'country' => $customer->get_shipping_country(),
-                        ),
-                    );
-
-                    $result = $customer_data;
+                    $result = $this->eux_create_customer_data($customer);
                 }
             }
-
-
 
             return new WP_REST_Response([
                 $result
@@ -174,13 +143,40 @@ if ( ! class_exists('EUX_CRM_API') ) {
 
         }
 
+        // search customer by phone number
+        function eux_search_customer_by_phone($request) {
+            $result  = [];
+            $phone = $request->get_param('phoneNumber');
+
+            if( isset($phone) && ! empty($phone) ) {
+                $user_id = '';
+                global $wpdb;
+                $search_phone = (string)"%" . $phone . "%";
+
+                $query = "SELECT * FROM $wpdb->usermeta WHERE $wpdb->usermeta.meta_key = 'billing_phone' AND $wpdb->usermeta.meta_value LIKE '" . $search_phone . "'  ORDER BY $wpdb->usermeta.user_id DESC";
+
+                $customer = $wpdb->get_results($query, OBJECT);
+
+                if( isset($phone) || isset($email) ) {
+                    if (isset($customer) && count($customer) > 0) {
+                        $user_id = $customer[0]->user_id;
+
+                        $customer = new WC_Customer($user_id);
+                        $result = $this->eux_create_customer_data($customer);
+                    }
+                }
+            }
+
+            return new WP_REST_Response([
+                $result
+            ]);
+        }
+
         // post to create a new customer
         function eux_post_to_create_new_customer($request) {
             // Fetching values from API
             $parameters = $request->get_params();
             $data = [];
-
-
 
             if( isset($parameters['email']) && isset($parameters['firstname']) ) {
 
@@ -208,6 +204,57 @@ if ( ! class_exists('EUX_CRM_API') ) {
                 $data
             ]);
 
+        }
+
+        // create customer data
+        function eux_create_customer_data($customer) {
+
+            if( ! $customer ) {
+                return [];
+            }
+
+            $last_order = $customer->get_last_order();
+
+            $customer_data = array(
+                'id' => $customer->get_id(),
+                'email' => $customer->get_email(),
+                'first_name' => $customer->get_first_name(),
+                'last_name' => $customer->get_last_name(),
+                'username' => $customer->get_username(),
+                'role' => $customer->get_role(),
+                'phone' => $customer->get_billing_phone(),
+                'last_order_id' => is_object($last_order) ? $last_order->get_id() : null,
+                'last_order_date' => is_object($last_order) ? eux_format_datetime($last_order->get_date_created() ? $last_order->get_date_created()->getTimestamp() : 0) : null, // API gives UTC times.
+                'orders_count' => $customer->get_order_count(),
+                'total_spent' => wc_format_decimal($customer->get_total_spent(), 2),
+                'avatar_url' => $customer->get_avatar_url(),
+                'billing_address' => array(
+                    'first_name' => $customer->get_billing_first_name(),
+                    'last_name' => $customer->get_billing_last_name(),
+                    'company' => $customer->get_billing_company(),
+                    'address_1' => $customer->get_billing_address_1(),
+                    'address_2' => $customer->get_billing_address_2(),
+                    'city' => $customer->get_billing_city(),
+                    'state' => $customer->get_billing_state(),
+                    'postcode' => $customer->get_billing_postcode(),
+                    'country' => $customer->get_billing_country(),
+                    'email' => $customer->get_billing_email(),
+                    'phone' => $customer->get_billing_phone(),
+                ),
+                'shipping_address' => array(
+                    'first_name' => $customer->get_shipping_first_name(),
+                    'last_name' => $customer->get_shipping_last_name(),
+                    'company' => $customer->get_shipping_company(),
+                    'address_1' => $customer->get_shipping_address_1(),
+                    'address_2' => $customer->get_shipping_address_2(),
+                    'city' => $customer->get_shipping_city(),
+                    'state' => $customer->get_shipping_state(),
+                    'postcode' => $customer->get_shipping_postcode(),
+                    'country' => $customer->get_shipping_country(),
+                ),
+            );
+
+            return $customer_data;
         }
     }
 }
